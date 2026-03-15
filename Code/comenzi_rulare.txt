@@ -1,0 +1,5 @@
+sudo rm -rf /var/local/PackageMonitor
+cd PackageMonitor
+chmod +x monitor.sh frontend.sh helper_functions.sh
+sudo ./monitor.sh
+sudo ./frontend.sh
