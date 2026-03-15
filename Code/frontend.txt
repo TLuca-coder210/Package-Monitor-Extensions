@@ -1,0 +1,42 @@
+#!/bin/bash
+\source ./helper_functions.sh
+
+while true; do
+    clear
+    echo "=========================================="
+    echo "       PACKAGE MONITOR EXTENSIONS"
+    echo "=========================================="
+    echo "1. Lista pachete instalate"
+    echo "2. Lista pachete eliminate"
+    echo "3. Istoric pachet specific"
+    echo "4. Pachete dintr-o perioadă"
+    echo "5. Pachete instalate parțial"
+    echo "6. Pachete noi în sistem"
+    echo "7. Dimensiune pachet"
+    echo "8. Dimensiune totală instalată"
+    echo "9. Afișează Undo Cache (LRU)"
+    echo "0. Ieșire"
+    echo "------------------------------------------"
+    read -p "Alege o opțiune [0-9]: " opt
+
+    case $opt in
+        1) lista_pachete_instalate ;;
+        2) lista_pachete_eliminate ;;
+        3) istoric_pachet ;;
+        4) pachete_perioada ;;
+        5) lista_partiale ;;
+        6) pachete_noi ;;
+        7) dimensiune_pachet ;;
+        8) afiseaza_spatiu_total ;;
+        9) afiseaza_undo_cache ;;
+        0) 
+            echo "Iesire din program. La revedere, $USER!"
+            break 
+            ;;
+        *) 
+            echo "Optiune invalida! Va rugam introduceti o cifra intre 0 si 9." 
+            ;;
+    esac
+
+    read -p "Apasă ENTER pentru a continua..."
+done
