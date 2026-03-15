@@ -1,0 +1,139 @@
+#!/bin/bash
+
+# folderul unde monitorul pune datele
+WORK_DIR="/var/local/PackageMonitor"
+
+# cerinta 1 - afisare pachete
+function lista_pachete_instalate() {
+    echo "--- Pachete instalate acum ---"
+    nr=0
+    for f in "$WORK_DIR"/*/; do
+        # sarim peste index_data ca nu e pachet
+        if [[ "$f" == *"index_data"* ]]; then continue; fi
+        
+        if [ -f "${f}stare_curenta.dat" ]; then
+            # cautam install in fisierul de stare
+            if grep -q "ULTIMA_ACTIUNE=install" "${f}stare_curenta.dat"; then
+                nume=$(basename "$f")
+                # am scos data cu cut si grep
+                data_i=$(grep -o "DATA=[^ ]*" "${f}stare_curenta.dat" | cut -d'=' -f2)
+                echo "Pachet: $nume ($data_i)"
+                nr=$((nr+1))
+            fi
+        fi
+    done
+    [ $nr -eq 0 ] && echo "Nimic instalat."
+}
+
+# 2. Lista pachetelor eliminate
+function lista_pachete_eliminate() {
+    echo -e "\n--- PACHETE ELIMINATE DIN SISTEM ---"
+    nr=0
+    for folder in "$WORK_DIR"/*/; do
+        if [[ "$folder" == *"index_data"* ]]; then continue; fi
+        if [ -f "${folder}stare_curenta.dat" ]; then
+            if grep -q "ULTIMA_ACTIUNE=remove" "${folder}stare_curenta.dat"; then
+                pachet_nume=$(basename "$folder")
+                data_rem=$(grep -o "DATA=[^ ]*" "${folder}stare_curenta.dat" | cut -d'=' -f2)
+                echo "Pachet: $pachet_nume | Data eliminare: $data_rem"
+                nr=$((nr+1))
+            fi
+        fi
+    done
+    [ $nr -eq 0 ] && echo "Nu s-au gasit pachete eliminate."
+}
+
+# 3. Istoria operatiilor pentru un anumit pachet
+function istoric_pachet() {
+    read -p "Introduceti numele exact al pachetului: " pac
+    if [ -f "$WORK_DIR/$pac/istoric.log" ]; then
+        echo "--- Istoric pentru $pac ---"
+        cat "$WORK_DIR/$pac/istoric.log"
+    else
+        echo "Pachetul '$pac' nu exista in baza de date."
+    fi
+}
+
+# 4. Lista pachete dintr-o perioada data
+function pachete_perioada() {
+    read -p "Data start (AAAA-LL-ZZ): " d_st
+    read -p "Data sfarsit (AAAA-LL-ZZ): " d_end
+    echo "--- Pachete modificate intre $d_st si $d_end ---"
+    ok=0
+    for file in "$WORK_DIR/index_data"/*; do
+        fname=$(basename "$file")
+        fdate=${fname:0:10}
+        if [[ ! "$fdate" < "$d_st" ]] && [[ ! "$fdate" > "$d_end" ]]; then
+            echo "[Data: $fdate | Tip: ${fname#*_}]"
+            cat "$file" | sort | uniq
+            ok=1
+        fi
+    done
+    [ $ok -eq 0 ] && echo "Nu exista date pentru aceasta perioada."
+}
+
+# 5. Pachete instalate partial
+function lista_partiale() {
+    echo -e "\n--- INSTALARI PARTIALE ---"
+    ok=0
+    for folder in "$WORK_DIR"/*/; do
+        if [ -f "${folder}istoric.log" ]; then
+            if grep -q "half-installed" "${folder}istoric.log"; then
+                pac_nume=$(basename "$folder")
+                echo -n "Pachet: $pac_nume -> "
+                if grep -q "ULTIMA_ACTIUNE=install" "${folder}stare_curenta.dat"; then
+                    echo "S-a reparat (Instalat Corect)"
+                else
+                    echo "Defect (Partial instalat)"
+                fi
+                ok=1
+            fi
+        fi
+    done
+    [ $ok -eq 0 ] && echo "Nu au fost probleme la instalare."
+}
+#6
+function pachete_noi() {
+    echo -e "\n--- PACHETE INSTALATE PENTRU PRIMA DATA ---"
+    for folder in "$WORK_DIR"/*/; do
+        if [[ "$folder" == *"index_data"* ]]; then continue; fi
+        
+        # Daca exista istoricul si NU gasim "remove"
+        if [ -f "${folder}istoric.log" ] && ! grep -q "remove " "${folder}istoric.log"; then
+            echo "Pachet nou: $(basename "$folder")"
+        fi
+    done
+}   
+
+
+# 7. Dimensiunea unui pachet
+function dimensiune_pachet() {
+    read -p "Nume pachet: " pkg
+    size=$(dpkg-query -W -f='${Installed-Size}' "$pac" 2>/dev/null)
+    if [ ! -z "$size" ]; then
+        echo "Dimensiune $pac: $size KB"
+    else
+        echo "Pachetul nu este instalat."
+    fi
+}
+
+# 8. Afisare spatiu total
+function afiseaza_spatiu_total() {
+    if [ -f "$WORK_DIR/total_size.dat" ]; then
+        echo "Spatiul total are: $(cat "$WORK_DIR/total_size.dat") KB"
+    else
+        echo "Nu exista ?."
+    fi
+}
+
+# cerinta 9 - cache pentru undo
+function afiseaza_undo_cache() {
+    echo "--- Ultimele 10 stergeri ---"
+    fis_cache="$WORK_DIR/undo_cache.log"
+    if [ -s "$fis_cache" ]; then
+        # folosim awk ca sa nu avem duplicate daca rulam monitorul de mai multe ori
+        awk '!x[$0]++' "$fis_cache" | head -n 10
+    else
+        echo "Nu avem nimic in cache."
+    fi
+}
